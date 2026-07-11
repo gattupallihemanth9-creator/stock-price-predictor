@@ -7,3 +7,4 @@ scikit-learn>=1.3.0
 requests>=2.31.0
 python-dateutil>=2.8.0
 nsepython>=2.0
+gunicorn>=21.2.0
