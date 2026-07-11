@@ -186,7 +186,7 @@ def _safe_float(v):
         return None
 
 
-def _stale(ticker: str, hours: int = 6) -> bool:
+def _stale(ticker: str, hours: int = 12) -> bool:
     """Return True if the cached data is older than `hours` hours."""
     stock = Stock.query.filter_by(ticker=ticker).first()
     if not stock or not stock.last_updated:
@@ -263,11 +263,11 @@ def api_stock(ticker):
     except Exception as e:
         return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
 
-    # Run prediction
+    # Run prediction (pass ticker for LSTM model caching)
     try:
-        prediction = predict(df)
+        prediction = predict(df, ticker=ticker)
     except Exception as e:
-        prediction = {"error": str(e), "predictions": []}
+        prediction = {"error": str(e), "predictions": [], "model_type": "none"}
 
     # Persist latest predictions to DB
     if prediction.get("predictions"):

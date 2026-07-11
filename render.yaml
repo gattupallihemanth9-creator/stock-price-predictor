@@ -2,8 +2,10 @@ services:
   - type: web
     name: stock-price-predictor
     runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m gunicorn app:app --workers 2 --threads 2 --timeout 120 --bind 0.0.0.0:$PORT
+    region: singapore
+    plan: free
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python -m gunicorn app:app --workers 1 --threads 4 --timeout 300 --bind 0.0.0.0:$PORT
     envVars:
       - key: SECRET_KEY
         generateValue: true
@@ -11,3 +13,7 @@ services:
         value: /tmp
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: TF_CPP_MIN_LOG_LEVEL
+        value: "3"
+      - key: TF_ENABLE_ONEDNN_OPTS
+        value: "0"

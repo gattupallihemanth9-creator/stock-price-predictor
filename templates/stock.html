@@ -25,8 +25,8 @@
 <!-- ── LOADING OVERLAY ─────────────────────────────────────────────────── -->
 <div id="pageLoader" class="page-loader">
   <div class="spinner large"></div>
-  <p>Fetching data &amp; running predictions for <strong>{{ ticker }}</strong>…</p>
-  <p class="loader-sub">First load may take 30–60 seconds</p>
+  <p>Fetching data &amp; training LSTM model for <strong>{{ ticker }}</strong>…</p>
+  <p class="loader-sub">First load takes 1–2 minutes — training neural network on historical data</p>
 </div>
 
 <!-- ── MAIN CONTENT (hidden until data loads) ──────────────────────────── -->
@@ -89,7 +89,7 @@
   <section class="section">
     <div class="container">
       <div class="section-header">
-        <h2><i class="fas fa-robot"></i> AI Price Predictions</h2>
+        <h2><i class="fas fa-robot"></i> LSTM Neural Network Predictions</h2>
         <p class="section-sub" id="predConfidence"></p>
       </div>
       <div class="pred-cards" id="predCards">
@@ -249,7 +249,7 @@
     }
 
     document.getElementById("predConfidence").textContent =
-      `Model confidence: ${pred.confidence}%  |  MAPE: ${pred.mape ?? "N/A"}%`;
+      `Model: ${pred.model_type || "LSTM"}  |  Confidence: ${pred.confidence}%  |  MAPE: ${pred.mape ?? "N/A"}%`;
 
     const cards = pred.predictions.map(p => {
       const dir  = p.pct_change >= 0 ? "up" : "down";
