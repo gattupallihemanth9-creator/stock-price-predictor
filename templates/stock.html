@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ ticker }} – StockVision</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <!-- Chart.js v4 (no external adapter needed) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ── NAVBAR ──────────────────────────────────────────────────────────── -->
+<nav class="navbar">
+  <div class="nav-brand">
+    <a href="/"><i class="fas fa-chart-line"></i><span>StockVision</span></a>
+  </div>
+  <div class="nav-links">
+    <a href="/"><i class="fas fa-home"></i> Home</a>
+    <a href="/watchlist"><i class="fas fa-star"></i> Watchlist</a>
+  </div>
+</nav>
+
+<!-- ── LOADING OVERLAY ─────────────────────────────────────────────────── -->
+<div id="pageLoader" class="page-loader">
+  <div class="spinner large"></div>
+  <p>Fetching data &amp; running predictions for <strong>{{ ticker }}</strong>…</p>
+  <p class="loader-sub">First load may take 30–60 seconds</p>
+</div>
+
+<!-- ── MAIN CONTENT (hidden until data loads) ──────────────────────────── -->
+<div id="mainContent" class="hidden">
+
+  <!-- Stock header -->
+  <section class="stock-hero">
+    <div class="container">
+      <div class="stock-header">
+        <div class="stock-title">
+          <a href="/" class="back-link"><i class="fas fa-arrow-left"></i> Back</a>
+          <h1 id="stockName">–</h1>
+          <span id="stockTicker" class="ticker-badge">{{ ticker }}</span>
+          <span id="stockSector" class="sector-badge"></span>
+        </div>
+        <div class="stock-price-block">
+          <div class="current-price" id="currentPrice">–</div>
+          <div class="price-change" id="priceChange">–</div>
+          <!-- Live NSE badge – shown only for .NS tickers -->
+          <div id="liveNSEBadge" class="live-badge hidden">
+            <span class="live-dot"></span> LIVE NSE
+            <span id="livePrice"></span>
+            <span id="liveChange"></span>
+            <span id="liveTime" class="live-time"></span>
+          </div>
+          <button id="watchlistBtn" class="btn-outline" onclick="toggleWatchlist()">
+            <i class="fas fa-star"></i> Add to Watchlist
+          </button>
+        </div>
+      </div>
+
+      <!-- Key stats strip -->
+      <div class="stats-strip">
+        <div class="stat-item">
+          <label>52W High</label><span id="stat52High">–</span>
+        </div>
+        <div class="stat-item">
+          <label>52W Low</label><span id="stat52Low">–</span>
+        </div>
+        <div class="stat-item">
+          <label>Market Cap</label><span id="statMktCap">–</span>
+        </div>
+        <div class="stat-item">
+          <label>P/E Ratio</label><span id="statPE">–</span>
+        </div>
+        <div class="stat-item">
+          <label>Beta</label><span id="statBeta">–</span>
+        </div>
+        <div class="stat-item">
+          <label>RSI (14)</label><span id="statRSI">–</span>
+        </div>
+        <div class="stat-item">
+          <label>RSI Signal</label><span id="statRSISignal">–</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PREDICTION CARDS ────────────────────────────────────────────── -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2><i class="fas fa-robot"></i> AI Price Predictions</h2>
+        <p class="section-sub" id="predConfidence"></p>
+      </div>
+      <div class="pred-cards" id="predCards">
+        <div class="pred-card skeleton"></div>
+        <div class="pred-card skeleton"></div>
+        <div class="pred-card skeleton"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CHARTS ──────────────────────────────────────────────────────── -->
+  <section class="section section-alt">
+    <div class="container">
+      <div class="section-header">
+        <h2><i class="fas fa-chart-area"></i> Price History &amp; Forecast</h2>
+        <!-- Time range buttons -->
+        <div class="range-btns">
+          <button class="range-btn active" data-days="90">3M</button>
+          <button class="range-btn" data-days="180">6M</button>
+          <button class="range-btn" data-days="365">1Y</button>
+          <button class="range-btn" data-days="730">2Y</button>
+          <button class="range-btn" data-days="0">All</button>
+        </div>
+      </div>
+
+      <!-- Tab buttons -->
+      <div class="chart-tabs">
+        <button class="chart-tab active" data-chart="line">Line</button>
+        <button class="chart-tab" data-chart="candle">Candlestick</button>
+        <button class="chart-tab" data-chart="volume">Volume</button>
+        <button class="chart-tab" data-chart="rsi">RSI</button>
+        <button class="chart-tab" data-chart="macd">MACD</button>
+      </div>
+
+      <div class="chart-container">
+        <canvas id="lineChart"></canvas>
+        <canvas id="candleChart" class="hidden"></canvas>
+        <canvas id="volumeChart" class="hidden"></canvas>
+        <canvas id="rsiChart" class="hidden"></canvas>
+        <canvas id="macdChart" class="hidden"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── TECHNICAL INDICATORS TABLE ────────────────────────────────── -->
+  <section class="section">
+    <div class="container">
+      <div class="section-header">
+        <h2><i class="fas fa-table"></i> Technical Indicators</h2>
+      </div>
+      <div class="indicators-grid">
+        <div class="ind-card">
+          <label>SMA 20</label><span id="ind-sma20">–</span>
+        </div>
+        <div class="ind-card">
+          <label>SMA 50</label><span id="ind-sma50">–</span>
+        </div>
+        <div class="ind-card">
+          <label>SMA 200</label><span id="ind-sma200">–</span>
+        </div>
+        <div class="ind-card">
+          <label>MACD</label><span id="ind-macd">–</span>
+        </div>
+        <div class="ind-card">
+          <label>Signal Line</label><span id="ind-macd-signal">–</span>
+        </div>
+        <div class="ind-card">
+          <label>BB Upper</label><span id="ind-bb-upper">–</span>
+        </div>
+        <div class="ind-card">
+          <label>BB Lower</label><span id="ind-bb-lower">–</span>
+        </div>
+        <div class="ind-card">
+          <label>Trend</label><span id="ind-trend">–</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /#mainContent -->
+
+<!-- ── ERROR STATE ─────────────────────────────────────────────────────── -->
+<div id="errorState" class="hidden error-page">
+  <i class="fas fa-exclamation-triangle"></i>
+  <h2>Could not load stock data</h2>
+  <p id="errorMsg">Please check the ticker symbol and try again.</p>
+  <a href="/" class="btn-primary">← Go Back</a>
+</div>
+
+<footer class="footer">
+  <p>StockVision &copy; 2024 &mdash; For educational purposes only. Not financial advice.</p>
+</footer>
+
+<script src="/static/js/main.js"></script>
+<script>
+  const TICKER = "{{ ticker }}";
+  let stockData = null;
+  let activeDays = 90;
+  let activeChart = "line";
+
+  // Chart instances
+  let lineChartInst   = null;
+  let candleChartInst = null;
+  let volumeChartInst = null;
+  let rsiChartInst    = null;
+  let macdChartInst   = null;
+
+  // ── Load data ──────────────────────────────────────────────────────────
+  async function loadStock() {
+    try {
+      const res  = await fetch(`/api/stock/${TICKER}`);
+      const data = await res.json();
+
+      if (data.error) throw new Error(data.error);
+      stockData = data;
+
+      renderHeader(data.stock_info);
+      renderPredictions(data.prediction);
+      renderIndicatorTable(data.indicators, data.prediction);
+      renderAllCharts(data.indicators, data.prediction, activeDays);
+
+      document.getElementById("pageLoader").classList.add("hidden");
+      document.getElementById("mainContent").classList.remove("hidden");
+    } catch (err) {
+      document.getElementById("pageLoader").classList.add("hidden");
+      document.getElementById("errorMsg").textContent = err.message;
+      document.getElementById("errorState").classList.remove("hidden");
+    }
+  }
+
+  // ── Header ──────────────────────────────────────────────────────────────
+  function renderHeader(info) {
+    document.title = `${info.ticker} – StockVision`;
+    document.getElementById("stockName").textContent    = info.company_name || info.ticker;
+    document.getElementById("stockSector").textContent  = info.sector || "";
+    document.getElementById("currentPrice").textContent = `$${info.current_price.toFixed(2)}`;
+    document.getElementById("stat52High").textContent   = info.fifty_two_week_high ? `$${info.fifty_two_week_high.toFixed(2)}` : "–";
+    document.getElementById("stat52Low").textContent    = info.fifty_two_week_low  ? `$${info.fifty_two_week_low.toFixed(2)}`  : "–";
+    document.getElementById("statMktCap").textContent   = info.market_cap ? formatMarketCap(info.market_cap) : "–";
+    document.getElementById("statPE").textContent       = info.pe_ratio   ? info.pe_ratio.toFixed(2) : "–";
+    document.getElementById("statBeta").textContent     = info.beta       ? info.beta.toFixed(2) : "–";
+  }
+
+  function formatMarketCap(v) {
+    if (v >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
+    if (v >= 1e9)  return `$${(v / 1e9).toFixed(2)}B`;
+    if (v >= 1e6)  return `$${(v / 1e6).toFixed(2)}M`;
+    return `$${v.toLocaleString()}`;
+  }
+
+  // ── Predictions ─────────────────────────────────────────────────────────
+  function renderPredictions(pred) {
+    if (!pred || pred.error) {
+      document.getElementById("predCards").innerHTML =
+        `<p class="text-muted">${pred?.error || "Prediction unavailable."}</p>`;
+      return;
+    }
+
+    document.getElementById("predConfidence").textContent =
+      `Model confidence: ${pred.confidence}%  |  MAPE: ${pred.mape ?? "N/A"}%`;
+
+    const cards = pred.predictions.map(p => {
+      const dir  = p.pct_change >= 0 ? "up" : "down";
+      const icon = p.pct_change >= 0 ? "▲" : "▼";
+      return `
+        <div class="pred-card trend-${p.trend.toLowerCase()}">
+          <div class="pred-horizon">${p.horizon_days}-Day Forecast</div>
+          <div class="pred-price">$${p.predicted_price.toFixed(2)}</div>
+          <div class="pred-change ${dir}">${icon} ${Math.abs(p.pct_change).toFixed(2)}%</div>
+          <div class="pred-trend badge badge-${p.trend.toLowerCase()}">${p.trend}</div>
+          <div class="pred-conf">Confidence: ${p.confidence}%</div>
+        </div>`;
+    }).join("");
+    document.getElementById("predCards").innerHTML = cards;
+  }
+
+  // ── Indicator table ──────────────────────────────────────────────────────
+  function renderIndicatorTable(ind, pred) {
+    const last = i => { const a = ind[i]; return a && a.length ? a[a.length - 1] : null; };
+    const fmt  = v => v != null ? `$${parseFloat(v).toFixed(2)}` : "–";
+
+    document.getElementById("ind-sma20").textContent       = fmt(last("sma_20"));
+    document.getElementById("ind-sma50").textContent       = fmt(last("sma_50"));
+    document.getElementById("ind-sma200").textContent      = fmt(last("sma_200"));
+    document.getElementById("ind-macd").textContent        = last("macd")        != null ? parseFloat(last("macd")).toFixed(4) : "–";
+    document.getElementById("ind-macd-signal").textContent = last("macd_signal") != null ? parseFloat(last("macd_signal")).toFixed(4) : "–";
+    document.getElementById("ind-bb-upper").textContent    = fmt(last("bb_upper"));
+    document.getElementById("ind-bb-lower").textContent    = fmt(last("bb_lower"));
+    document.getElementById("ind-trend").textContent       = pred?.trend || "–";
+
+    const rsiVal = ind.latest_rsi;
+    document.getElementById("statRSI").textContent      = rsiVal != null ? rsiVal.toFixed(2) : "–";
+    document.getElementById("statRSISignal").textContent = ind.rsi_signal || "–";
+
+    // Color RSI
+    const rsiEl = document.getElementById("statRSI");
+    if (rsiVal < 30) rsiEl.classList.add("text-green");
+    else if (rsiVal > 70) rsiEl.classList.add("text-red");
+  }
+
+  // ── Charts ───────────────────────────────────────────────────────────────
+  function sliceByDays(ind, days) {
+    if (!days) return ind;  // 0 = All
+    const n = days;
+    const sliced = {};
+    for (const [k, v] of Object.entries(ind)) {
+      sliced[k] = Array.isArray(v) ? v.slice(-n) : v;
+    }
+    return sliced;
+  }
+
+  function renderAllCharts(ind, pred, days) {
+    const s = sliceByDays(ind, days);
+    renderLineChart(s, pred);
+    renderCandleChart(s);
+    renderVolumeChart(s);
+    renderRSIChart(s);
+    renderMACDChart(s);
+  }
+
+  const CHART_DEFAULTS = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: { legend: { labels: { color: "#e2e8f0", boxWidth: 12, padding: 16 } } },
+    scales: {
+      x: {
+        ticks: {
+          color: "#94a3b8",
+          maxTicksLimit: 10,
+          maxRotation: 0,
+        },
+        grid: { color: "#1e293b" },
+      },
+      y: {
+        ticks: { color: "#94a3b8" },
+        grid: { color: "#1e293b" },
+      },
+    },
+  };
+
+  function renderLineChart(ind, pred) {
+    if (lineChartInst) lineChartInst.destroy();
+    const ctx = document.getElementById("lineChart").getContext("2d");
+
+    const datasets = [
+      { label: "Close Price", data: ind.close, borderColor: "#38bdf8", backgroundColor: "rgba(56,189,248,0.08)", borderWidth: 2, pointRadius: 0, tension: 0.3 },
+      { label: "SMA 20",  data: ind.sma_20,  borderColor: "#f59e0b", borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
+      { label: "SMA 50",  data: ind.sma_50,  borderColor: "#a78bfa", borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
+      { label: "SMA 200", data: ind.sma_200, borderColor: "#fb923c", borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
+    ];
+
+    // Append forecast
+    if (pred && pred.forecast_dates && pred.forecast_prices) {
+      const forecastPad = new Array(ind.dates.length).fill(null);
+      const forecastData = [...forecastPad, ...pred.forecast_prices];
+      const allDates     = [...ind.dates, ...pred.forecast_dates];
+      datasets[0].data   = [...ind.close, ...new Array(pred.forecast_prices.length).fill(null)];
+      datasets.push({
+        label: "Forecast",
+        data: forecastData,
+        borderColor: "#4ade80",
+        borderDash: [6, 3],
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+        backgroundColor: "rgba(74,222,128,0.06)",
+      });
+      lineChartInst = new Chart(ctx, {
+        type: "line",
+        data: { labels: allDates, datasets },
+        options: CHART_DEFAULTS,
+      });
+      return;
+    }
+
+    lineChartInst = new Chart(ctx, {
+      type: "line",
+      data: { labels: ind.dates, datasets },
+      options: CHART_DEFAULTS,
+    });
+  }
+
+  function renderCandleChart(ind) {
+    if (candleChartInst) candleChartInst.destroy();
+    const ctx = document.getElementById("candleChart").getContext("2d");
+
+    // Draw OHLC bars as a custom inline plugin (no external lib needed)
+    const ohlcPlugin = {
+      id: "ohlcBars",
+      beforeDatasetsDraw(chart) {
+        const { ctx: c, scales: { x, y } } = chart;
+        const dates  = ind.dates;
+        const opens  = ind.open;
+        const highs  = ind.high;
+        const lows   = ind.low;
+        const closes = ind.close;
+        const n      = dates.length;
+        if (!n) return;
+
+        const barW = Math.max(1, (x.right - x.left) / n * 0.6);
+
+        c.save();
+        c.lineWidth = Math.max(1, barW * 0.15);
+
+        for (let i = 0; i < n; i++) {
+          const xPos = x.getPixelForValue(i);
+          const o = y.getPixelForValue(opens[i]  || 0);
+          const h = y.getPixelForValue(highs[i]  || 0);
+          const l = y.getPixelForValue(lows[i]   || 0);
+          const cl= y.getPixelForValue(closes[i] || 0);
+
+          const color = closes[i] >= opens[i] ? "#4ade80" : "#f87171";
+          c.strokeStyle = color;
+          c.fillStyle   = color;
+
+          // High-low wick
+          c.beginPath();
+          c.moveTo(xPos, h);
+          c.lineTo(xPos, l);
+          c.stroke();
+
+          // Body
+          const bodyTop    = Math.min(o, cl);
+          const bodyBottom = Math.max(o, cl);
+          const bodyH      = Math.max(1, bodyBottom - bodyTop);
+          c.fillRect(xPos - barW / 2, bodyTop, barW, bodyH);
+        }
+        c.restore();
+      },
+    };
+
+    candleChartInst = new Chart(ctx, {
+      type: "bar",
+      plugins: [ohlcPlugin],
+      data: {
+        labels: ind.dates,
+        datasets: [{
+          data: ind.close,   // invisible – just needed so Chart.js builds scales
+          backgroundColor: "transparent",
+          borderColor: "transparent",
+        }],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const i = ctx.dataIndex;
+                return [
+                  `Open:  $${(ind.open[i]  || 0).toFixed(2)}`,
+                  `High:  $${(ind.high[i]  || 0).toFixed(2)}`,
+                  `Low:   $${(ind.low[i]   || 0).toFixed(2)}`,
+                  `Close: $${(ind.close[i] || 0).toFixed(2)}`,
+                ];
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  function renderVolumeChart(ind) {
+    if (volumeChartInst) volumeChartInst.destroy();
+    const ctx = document.getElementById("volumeChart").getContext("2d");
+    volumeChartInst = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: ind.dates,
+        datasets: [{
+          label: "Volume",
+          data: ind.volume,
+          backgroundColor: ind.close.map((c, i) =>
+            i === 0 || c >= ind.close[i - 1] ? "rgba(74,222,128,0.6)" : "rgba(248,113,113,0.6)"
+          ),
+          borderWidth: 0,
+        }],
+      },
+      options: { ...CHART_DEFAULTS, plugins: { legend: { display: false } } },
+    });
+  }
+
+  function renderRSIChart(ind) {
+    if (rsiChartInst) rsiChartInst.destroy();
+    const ctx = document.getElementById("rsiChart").getContext("2d");
+    rsiChartInst = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: ind.dates,
+        datasets: [
+          { label: "RSI (14)", data: ind.rsi, borderColor: "#a78bfa", borderWidth: 2, pointRadius: 0, tension: 0.3 },
+          { label: "Overbought (70)", data: new Array(ind.dates.length).fill(70), borderColor: "#f87171", borderDash: [4, 4], borderWidth: 1, pointRadius: 0 },
+          { label: "Oversold (30)",   data: new Array(ind.dates.length).fill(30), borderColor: "#4ade80", borderDash: [4, 4], borderWidth: 1, pointRadius: 0 },
+        ],
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        scales: {
+          ...CHART_DEFAULTS.scales,
+          y: { min: 0, max: 100, ticks: { color: "#94a3b8" }, grid: { color: "#1e293b" } },
+        },
+      },
+    });
+  }
+
+  function renderMACDChart(ind) {
+    if (macdChartInst) macdChartInst.destroy();
+    const ctx = document.getElementById("macdChart").getContext("2d");
+    macdChartInst = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: ind.dates,
+        datasets: [
+          { type: "line", label: "MACD",   data: ind.macd,            borderColor: "#38bdf8", borderWidth: 2, pointRadius: 0, tension: 0.3 },
+          { type: "line", label: "Signal", data: ind.macd_signal,     borderColor: "#f59e0b", borderWidth: 2, pointRadius: 0, tension: 0.3 },
+          { type: "bar",  label: "Histogram", data: ind.macd_histogram,
+            backgroundColor: ind.macd_histogram.map(v => v >= 0 ? "rgba(74,222,128,0.5)" : "rgba(248,113,113,0.5)"),
+            borderWidth: 0 },
+        ],
+      },
+      options: CHART_DEFAULTS,
+    });
+  }
+
+  // ── Tab switching ────────────────────────────────────────────────────────
+  document.querySelectorAll(".chart-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".chart-tab").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      activeChart = btn.dataset.chart;
+
+      const canvases = { line: "lineChart", candle: "candleChart", volume: "volumeChart", rsi: "rsiChart", macd: "macdChart" };
+      Object.values(canvases).forEach(id => document.getElementById(id).classList.add("hidden"));
+      document.getElementById(canvases[activeChart]).classList.remove("hidden");
+    });
+  });
+
+  // ── Range buttons ────────────────────────────────────────────────────────
+  document.querySelectorAll(".range-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".range-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      activeDays = parseInt(btn.dataset.days);
+      if (stockData) renderAllCharts(stockData.indicators, stockData.prediction, activeDays);
+    });
+  });
+
+  // ── Watchlist toggle ─────────────────────────────────────────────────────
+  async function toggleWatchlist() {
+    const btn = document.getElementById("watchlistBtn");
+    const inList = btn.classList.contains("in-watchlist");
+    const method = inList ? "DELETE" : "POST";
+    const url    = inList ? "/api/watchlist/remove" : "/api/watchlist/add";
+
+    const res  = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker: TICKER }) });
+    const data = await res.json();
+
+    if (!data.error) {
+      btn.classList.toggle("in-watchlist");
+      btn.innerHTML = btn.classList.contains("in-watchlist")
+        ? '<i class="fas fa-star"></i> In Watchlist'
+        : '<i class="fas fa-star"></i> Add to Watchlist';
+    }
+  }
+
+  // ── Live NSE price refresh (only for .NS tickers) ──────────────────────────
+  const IS_NSE = TICKER.endsWith(".NS");
+
+  async function refreshLiveNSE() {
+    if (!IS_NSE) return;
+    try {
+      const res  = await fetch(`/api/nse/quote/${TICKER}`);
+      const data = await res.json();
+      if (data.error) return;
+
+      const badge     = document.getElementById("liveNSEBadge");
+      const priceEl   = document.getElementById("livePrice");
+      const changeEl  = document.getElementById("liveChange");
+      const timeEl    = document.getElementById("liveTime");
+      const mainPrice = document.getElementById("currentPrice");
+
+      const chg    = data.pct_change || 0;
+      const chgCls = chg >= 0 ? "text-green" : "text-red";
+      const icon   = chg >= 0 ? "▲" : "▼";
+
+      // Update main price display with live data
+      mainPrice.textContent = `₹${(data.last_price || 0).toFixed(2)}`;
+
+      priceEl.textContent  = `₹${(data.last_price || 0).toFixed(2)}`;
+      changeEl.className   = chgCls;
+      changeEl.textContent = ` ${icon} ${Math.abs(chg).toFixed(2)}% (₹${Math.abs(data.change || 0).toFixed(2)})`;
+      timeEl.textContent   = data.timestamp ? `as of ${data.timestamp}` : "";
+
+      badge.classList.remove("hidden");
+    } catch { /* silent fail – live data is best-effort */ }
+  }
+
+  // Refresh live price every 60 seconds for NSE stocks
+  if (IS_NSE) {
+    refreshLiveNSE();
+    setInterval(refreshLiveNSE, 60000);
+  }
+
+  loadStock();
+</script>
+</body>
+</html>

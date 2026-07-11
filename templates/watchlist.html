@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Watchlist – StockVision</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+
+<!-- ── NAVBAR ──────────────────────────────────────────────────────────── -->
+<nav class="navbar">
+  <div class="nav-brand">
+    <a href="/"><i class="fas fa-chart-line"></i><span>StockVision</span></a>
+  </div>
+  <div class="nav-links">
+    <a href="/"><i class="fas fa-home"></i> Home</a>
+    <a href="/watchlist" class="active"><i class="fas fa-star"></i> Watchlist</a>
+  </div>
+</nav>
+
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2><i class="fas fa-star"></i> My Watchlist</h2>
+      <p class="section-sub">Stocks you are tracking — stored in your session.</p>
+    </div>
+
+    {% if tickers %}
+      <div id="watchlistLoader" class="loader-wrap">
+        <div class="spinner"></div>
+        <p>Loading watchlist data…</p>
+      </div>
+
+      <div id="watchlistTable" class="wl-table hidden">
+        <div class="wl-header wl-row">
+          <span>Ticker</span>
+          <span>Company</span>
+          <span>Price</span>
+          <span>Change (1d)</span>
+          <span>Trend (30d)</span>
+          <span>Actions</span>
+        </div>
+        <div id="wlBody"></div>
+      </div>
+
+    {% else %}
+      <div class="empty-state">
+        <i class="fas fa-star-half-alt"></i>
+        <h3>Your watchlist is empty</h3>
+        <p>Search for a stock and click "Add to Watchlist" to start tracking it here.</p>
+        <a href="/" class="btn-primary">Browse Stocks</a>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<footer class="footer">
+  <p>StockVision &copy; 2024 &mdash; For educational purposes only. Not financial advice.</p>
+</footer>
+
+{% if tickers %}
+<script>
+  const TICKERS = {{ tickers | tojson }};
+
+  async function loadWatchlistRow(ticker) {
+    try {
+      const res  = await fetch(`/api/stock/${ticker}/history?days=2`);
+      const hist = await res.json();
+
+      let price = "–", change = "–", changeClass = "";
+      if (Array.isArray(hist) && hist.length >= 2) {
+        const prev = hist[hist.length - 2].close;
+        const curr = hist[hist.length - 1].close;
+        const pct  = ((curr - prev) / prev * 100).toFixed(2);
+        price       = `$${curr.toFixed(2)}`;
+        change      = `${pct >= 0 ? "+" : ""}${pct}%`;
+        changeClass = pct >= 0 ? "text-green" : "text-red";
+      } else if (Array.isArray(hist) && hist.length === 1) {
+        price = `$${hist[0].close.toFixed(2)}`;
+      }
+
+      // Fetch prediction trend
+      let trend = "–", trendClass = "";
+      try {
+        const pRes  = await fetch(`/api/stock/${ticker}`);
+        const pData = await pRes.json();
+        if (pData.prediction && pData.prediction.trend) {
+          trend      = pData.prediction.trend;
+          trendClass = `badge badge-${trend.toLowerCase()}`;
+        }
+      } catch { /* silent */ }
+
+      return { ticker, company: "–", price, change, changeClass, trend, trendClass };
+    } catch {
+      return { ticker, company: "–", price: "–", change: "–", changeClass: "", trend: "–", trendClass: "" };
+    }
+  }
+
+  async function removeFromWatchlist(ticker) {
+    const res  = await fetch("/api/watchlist/remove", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticker }),
+    });
+    const data = await res.json();
+    if (!data.error) {
+      document.getElementById(`wl-row-${ticker}`).remove();
+      const rows = document.querySelectorAll(".wl-data-row");
+      if (rows.length === 0) location.reload();
+    }
+  }
+
+  async function init() {
+    const rows = await Promise.all(TICKERS.map(loadWatchlistRow));
+    const body = document.getElementById("wlBody");
+
+    body.innerHTML = rows.map(r => `
+      <div class="wl-row wl-data-row" id="wl-row-${r.ticker}">
+        <span>
+          <a href="/stock/${r.ticker}" class="ticker-link">${r.ticker}</a>
+        </span>
+        <span class="text-muted">${r.company}</span>
+        <span class="font-bold">${r.price}</span>
+        <span class="${r.changeClass} font-bold">${r.change}</span>
+        <span><span class="${r.trendClass}">${r.trend}</span></span>
+        <span>
+          <a href="/stock/${r.ticker}" class="btn-outline btn-xs">
+            <i class="fas fa-chart-line"></i> Analyse
+          </a>
+          <button class="btn-danger btn-xs" onclick="removeFromWatchlist('${r.ticker}')">
+            <i class="fas fa-trash"></i>
+          </button>
+        </span>
+      </div>
+    `).join("");
+
+    document.getElementById("watchlistLoader").classList.add("hidden");
+    document.getElementById("watchlistTable").classList.remove("hidden");
+  }
+
+  init();
+</script>
+{% endif %}
+
+<script src="/static/js/main.js"></script>
+</body>
+</html>

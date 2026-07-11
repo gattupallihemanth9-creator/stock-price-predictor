@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockVision – AI Stock Price Predictor</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+</head>
+<body>
+
+<!-- ── NAVBAR ──────────────────────────────────────────────────────────── -->
+<nav class="navbar">
+  <div class="nav-brand">
+    <i class="fas fa-chart-line"></i>
+    <span>StockVision</span>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="active"><i class="fas fa-home"></i> Home</a>
+    <a href="/watchlist"><i class="fas fa-star"></i> Watchlist</a>
+  </div>
+</nav>
+
+<!-- ── HERO ────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-content">
+    <h1>AI-Powered Stock Predictions</h1>
+    <p>Analyse historical data, predict future prices, and discover the best stocks to invest in — all in one place.</p>
+
+    <!-- Search bar -->
+    <div class="search-wrapper">
+      <div class="search-box">
+        <i class="fas fa-search search-icon"></i>
+        <input type="text" id="searchInput" placeholder="Enter ticker symbol (e.g. AAPL, TSLA, INFY)…" autocomplete="off" />
+        <button id="searchBtn" class="btn-primary">Analyse</button>
+      </div>
+      <div id="searchSuggestions" class="suggestions hidden"></div>
+    </div>
+
+    <div class="popular-tags">
+      <span class="tag-label">Popular US:</span>
+      <a class="tag" href="/stock/AAPL">AAPL</a>
+      <a class="tag" href="/stock/TSLA">TSLA</a>
+      <a class="tag" href="/stock/NVDA">NVDA</a>
+      <a class="tag" href="/stock/MSFT">MSFT</a>
+    </div>
+    <div class="popular-tags" style="margin-top:0.5rem">
+      <span class="tag-label">NSE India:</span>
+      <a class="tag tag-nse" href="/stock/RELIANCE.NS">RELIANCE</a>
+      <a class="tag tag-nse" href="/stock/TCS.NS">TCS</a>
+      <a class="tag tag-nse" href="/stock/HDFCBANK.NS">HDFCBANK</a>
+      <a class="tag tag-nse" href="/stock/INFY.NS">INFY</a>
+      <a class="tag tag-nse" href="/stock/ICICIBANK.NS">ICICIBANK</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── MARKET OVERVIEW STRIP ────────────────────────────────────────────── -->
+<section class="market-strip">
+  <div class="strip-tabs">
+    <button class="strip-tab active" id="tabUS" onclick="switchStrip('us')">🇺🇸 US Markets</button>
+    <button class="strip-tab" id="tabNSE" onclick="switchStrip('nse')">🇮🇳 NSE India</button>
+    <span class="strip-time" id="stripTime"></span>
+  </div>
+  <div class="strip-inner" id="marketStrip">
+    <span class="strip-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading…</span>
+  </div>
+</section>
+
+<!-- ── NSE INDIA LIVE MARKET ─────────────────────────────────────────────── -->
+<section class="section" id="nseLiveSection" style="padding:2rem 0">
+  <div class="container">
+    <div class="section-header" style="margin-bottom:1.2rem">
+      <h2><i class="fas fa-rupee-sign"></i> NSE India – Live Prices</h2>
+      <p class="section-sub">Nifty 50 stocks · Prices in ₹ INR · Auto-refreshes every 60s</p>
+      <button class="btn-outline btn-sm" onclick="loadNSEMarket()">
+        <i class="fas fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+    <div id="nseLoader" class="loader-wrap" style="padding:1.5rem">
+      <div class="spinner"></div><p>Loading NSE live data…</p>
+    </div>
+    <div id="nseGrid" class="nse-grid hidden"></div>
+    <div id="nseError" class="error-box hidden"></div>
+  </div>
+</section>
+
+<!-- ── RECOMMENDATIONS ──────────────────────────────────────────────────── -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <h2><i class="fas fa-trophy"></i> Top 5 Recommended Stocks</h2>
+      <p class="section-sub">Ranked by AI prediction score, RSI health, and trend strength</p>
+      <button id="refreshRecs" class="btn-outline btn-sm">
+        <i class="fas fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+
+    <div id="recsLoader" class="loader-wrap">
+      <div class="spinner"></div>
+      <p>Analysing stocks… this may take a minute</p>
+    </div>
+
+    <div id="recsGrid" class="recs-grid hidden"></div>
+    <div id="recsError" class="error-box hidden"></div>
+  </div>
+</section>
+
+<!-- ── HOW IT WORKS ─────────────────────────────────────────────────────── -->
+<section class="section section-alt">
+  <div class="container">
+    <div class="section-header">
+      <h2>How It Works</h2>
+    </div>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-icon"><i class="fas fa-database"></i></div>
+        <h3>Historical Data</h3>
+        <p>We pull all available daily OHLCV data from Yahoo Finance and store it locally for fast access.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-icon"><i class="fas fa-brain"></i></div>
+        <h3>ML Prediction</h3>
+        <p>A Linear Regression model trained on lag features, rolling statistics, and momentum indicators predicts prices 7, 30, and 90 days ahead.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-icon"><i class="fas fa-chart-bar"></i></div>
+        <h3>Technical Analysis</h3>
+        <p>SMA, EMA, RSI, MACD, and Bollinger Bands are computed to give a full picture of each stock's health.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-icon"><i class="fas fa-lightbulb"></i></div>
+        <h3>Smart Recommendations</h3>
+        <p>Stocks are scored across prediction strength, RSI zone, SMA trend, and MACD signal to surface the best picks.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ───────────────────────────────────────────────────────────── -->
+<footer class="footer">
+  <p>StockVision &copy; 2024 &mdash; For educational purposes only. Not financial advice.</p>
+</footer>
+
+<script src="/static/js/main.js"></script>
+<script>
+  // ── Search ──
+  const input = document.getElementById("searchInput");
+  const btn   = document.getElementById("searchBtn");
+  const sugg  = document.getElementById("searchSuggestions");
+
+  function goToStock() {
+    const t = input.value.trim().toUpperCase();
+    if (t) window.location.href = `/stock/${t}`;
+  }
+
+  btn.addEventListener("click", goToStock);
+  input.addEventListener("keydown", e => { if (e.key === "Enter") goToStock(); });
+
+  input.addEventListener("input", async () => {
+    const q = input.value.trim();
+    if (q.length < 1) { sugg.classList.add("hidden"); return; }
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (!data.results.length) { sugg.classList.add("hidden"); return; }
+    sugg.innerHTML = data.results.map(r => {
+      const exBadge = r.exchange === "NSE"
+        ? `<span class="ex-badge ex-nse">NSE ₹</span>`
+        : `<span class="ex-badge ex-us">${r.exchange || "US"}</span>`;
+      return `<div class="sugg-item" onclick="window.location.href='/stock/${r.ticker}'">
+        <strong>${r.symbol || r.ticker}</strong>
+        <span>${r.name}</span>
+        ${exBadge}
+      </div>`;
+    }).join("");
+    sugg.classList.remove("hidden");
+  });
+
+  document.addEventListener("click", e => {
+    if (!e.target.closest(".search-wrapper")) sugg.classList.add("hidden");
+  });
+
+  // ── Market strip ──
+  const US_TICKERS  = ["AAPL","MSFT","GOOGL","AMZN","NVDA","TSLA","META","JPM"];
+  const NSE_SYMBOLS = "RELIANCE,TCS,HDFCBANK,INFY,ICICIBANK,SBIN,WIPRO,BHARTIARTL,KOTAKBANK,LT";
+  let activeStrip = "us";
+
+  async function loadUSStrip() {
+    const strip = document.getElementById("marketStrip");
+    strip.innerHTML = `<span class="strip-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading…</span>`;
+    const items = await Promise.all(US_TICKERS.map(async t => {
+      try {
+        const r = await fetch(`/api/stock/${t}/history?days=2`);
+        const d = await r.json();
+        if (!Array.isArray(d) || d.length < 2) return null;
+        const prev = d[d.length - 2].close;
+        const curr = d[d.length - 1].close;
+        const chg  = ((curr - prev) / prev * 100).toFixed(2);
+        const cls  = chg >= 0 ? "up" : "down";
+        const icon = chg >= 0 ? "▲" : "▼";
+        return `<a class="strip-item ${cls}" href="/stock/${t}"><b>${t}</b> $${curr.toFixed(2)} <small>${icon} ${Math.abs(chg)}%</small></a>`;
+      } catch { return null; }
+    }));
+    strip.innerHTML = items.filter(Boolean).join("") || "<span>Market data unavailable</span>";
+    updateStripTime();
+  }
+
+  async function loadNSEStrip() {
+    const strip = document.getElementById("marketStrip");
+    strip.innerHTML = `<span class="strip-loading"><i class="fas fa-circle-notch fa-spin"></i> Loading NSE…</span>`;
+    try {
+      const res  = await fetch(`/api/nse/market?symbols=${NSE_SYMBOLS}`);
+      const data = await res.json();
+      if (!data.quotes || !data.quotes.length) throw new Error("No data");
+      strip.innerHTML = data.quotes.map(q => {
+        const chg  = q.pct_change || 0;
+        const cls  = chg >= 0 ? "up" : "down";
+        const icon = chg >= 0 ? "▲" : "▼";
+        return `<a class="strip-item ${cls}" href="/stock/${q.ticker}">
+          <b>${q.symbol}</b> ₹${q.last_price.toFixed(2)}
+          <small>${icon} ${Math.abs(chg).toFixed(2)}%</small>
+        </a>`;
+      }).join("");
+    } catch {
+      strip.innerHTML = "<span>NSE data unavailable</span>";
+    }
+    updateStripTime();
+  }
+
+  function switchStrip(which) {
+    activeStrip = which;
+    document.getElementById("tabUS").classList.toggle("active", which === "us");
+    document.getElementById("tabNSE").classList.toggle("active", which === "nse");
+    which === "nse" ? loadNSEStrip() : loadUSStrip();
+  }
+
+  function updateStripTime() {
+    document.getElementById("stripTime").textContent =
+      "Updated: " + new Date().toLocaleTimeString();
+  }
+
+  // auto-refresh strip every 60s
+  setInterval(() => {
+    activeStrip === "nse" ? loadNSEStrip() : loadUSStrip();
+  }, 60000);
+
+  loadUSStrip();
+
+  // ── NSE Live Market Grid ──
+  async function loadNSEMarket() {
+    const grid   = document.getElementById("nseGrid");
+    const loader = document.getElementById("nseLoader");
+    const errBox = document.getElementById("nseError");
+
+    grid.classList.add("hidden");
+    errBox.classList.add("hidden");
+    loader.classList.remove("hidden");
+
+    try {
+      const res  = await fetch("/api/nse/market");
+      const data = await res.json();
+      loader.classList.add("hidden");
+      if (data.error) throw new Error(data.error);
+
+      grid.innerHTML = data.quotes.map(q => {
+        const chg    = q.pct_change || 0;
+        const chgCls = chg >= 0 ? "text-green" : "text-red";
+        const icon   = chg >= 0 ? "▲" : "▼";
+        return `
+          <a class="nse-card" href="/stock/${q.ticker}">
+            <div class="nse-card-top">
+              <span class="nse-symbol">${q.symbol}</span>
+              <span class="nse-exbadge">NSE</span>
+            </div>
+            <div class="nse-name">${q.company_name}</div>
+            <div class="nse-price">₹${(q.last_price || 0).toFixed(2)}</div>
+            <div class="nse-change ${chgCls}">
+              ${icon} ${Math.abs(chg).toFixed(2)}%
+              <span class="nse-abs">(₹${Math.abs(q.change || 0).toFixed(2)})</span>
+            </div>
+            <div class="nse-hl">
+              H: ₹${(q.day_high || 0).toFixed(2)} &nbsp; L: ₹${(q.day_low || 0).toFixed(2)}
+            </div>
+          </a>`;
+      }).join("");
+      grid.classList.remove("hidden");
+    } catch (err) {
+      loader.classList.add("hidden");
+      errBox.textContent = "NSE data error: " + err.message;
+      errBox.classList.remove("hidden");
+    }
+  }
+
+  // auto-refresh NSE grid every 60s
+  setInterval(loadNSEMarket, 60000);
+  loadNSEMarket();
+
+  // ── Recommendations ──
+  async function loadRecommendations() {
+    const grid   = document.getElementById("recsGrid");
+    const loader = document.getElementById("recsLoader");
+    const errBox = document.getElementById("recsError");
+
+    grid.classList.add("hidden");
+    errBox.classList.add("hidden");
+    loader.classList.remove("hidden");
+
+    try {
+      const res  = await fetch("/api/recommendations");
+      const data = await res.json();
+      loader.classList.add("hidden");
+
+      if (data.error) throw new Error(data.error);
+      if (!data.recommendations.length) throw new Error("No recommendations available.");
+
+      grid.innerHTML = data.recommendations.map(r => `
+        <div class="rec-card" onclick="window.location.href='/stock/${r.ticker}'">
+          <div class="rec-header">
+            <span class="rec-ticker">${r.ticker.replace(".NS","")}</span>
+            <span class="badge badge-${r.trend.toLowerCase()}">${r.trend}</span>
+          </div>
+          <div class="rec-price">${r.ticker.endsWith(".NS") ? "₹" : "$"}${r.current_price.toFixed(2)}</div>
+          <div class="rec-pred">
+            30-day target: <strong>${r.ticker.endsWith(".NS") ? "₹" : "$"}${r.predicted_price_30d.toFixed(2)}</strong>
+            <span class="${r.pct_change_30d >= 0 ? 'text-green' : 'text-red'}">
+              (${r.pct_change_30d >= 0 ? '+' : ''}${r.pct_change_30d.toFixed(2)}%)
+            </span>
+          </div>
+          <div class="rec-meta">
+            <span class="badge-risk risk-${r.risk.toLowerCase()}">
+              <i class="fas fa-shield-alt"></i> ${r.risk} Risk
+            </span>
+            <span class="rec-score">Score: ${r.score}/100</span>
+          </div>
+          <div class="rec-rsi">RSI: <strong>${r.rsi}</strong></div>
+          <p class="rec-reason">${r.reason}</p>
+          <button class="btn-primary btn-sm">View Analysis →</button>
+        </div>
+      `).join("");
+      grid.classList.remove("hidden");
+    } catch (err) {
+      loader.classList.add("hidden");
+      errBox.textContent = "Could not load recommendations: " + err.message;
+      errBox.classList.remove("hidden");
+    }
+  }
+
+  document.getElementById("refreshRecs").addEventListener("click", loadRecommendations);
+  loadRecommendations();
+</script>
+</body>
+</html>
