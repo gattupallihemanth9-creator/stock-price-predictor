@@ -219,13 +219,18 @@ def watchlist_page():
 # ---------------------------------------------------------------------------
 # API – stock data
 # ---------------------------------------------------------------------------
+# In-memory prediction cache to avoid recomputing on every request
+# { ticker: {"result": dict, "computed_at": datetime} }
+# ---------------------------------------------------------------------------
+_PRED_CACHE: dict = {}
+
 
 @app.route("/api/stock/<ticker>")
 def api_stock(ticker):
     """
-    Returns full stock analysis JSON:
-    { stock_info, indicators, prediction }
-    Fetches fresh data if cache is stale (> 6 h).
+    Returns stock analysis JSON: { stock_info, indicators, prediction }
+    Prediction is served from cache if available, otherwise returns a
+    'computing' status so the frontend can poll /api/stock/<ticker>/predict.
     """
     ticker = ticker.upper().strip()
 
@@ -234,7 +239,6 @@ def api_stock(ticker):
         if df is None:
             return jsonify({"error": f"Could not find data for ticker '{ticker}'. Please check the symbol."}), 404
     else:
-        # Load from DB
         stock = Stock.query.filter_by(ticker=ticker).first()
         rows = (PriceHistory.query
                 .filter_by(stock_id=stock.id)
@@ -257,19 +261,32 @@ def api_stock(ticker):
             "current_price": round(current_price, 2),
         }
 
-    # Run analysis
+    # Run technical analysis (fast — always included)
     try:
         indicators = build_indicators(df)
     except Exception as e:
         return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
 
-    # Run prediction (pass ticker for LSTM model caching)
-    try:
-        prediction = predict(df, ticker=ticker)
-    except Exception as e:
-        prediction = {"error": str(e), "predictions": [], "model_type": "none"}
+    # Check prediction cache first
+    cached = _PRED_CACHE.get(ticker)
+    if cached and (datetime.utcnow() - cached["computed_at"]).total_seconds() < 43200:
+        prediction = cached["result"]
+    else:
+        # Run prediction synchronously — XGBoost is fast enough (2-3s)
+        try:
+            prediction = predict(df, ticker=ticker)
+            _PRED_CACHE[ticker] = {
+                "result":      prediction,
+                "computed_at": datetime.utcnow(),
+            }
+        except Exception as e:
+            prediction = {
+                "error":       str(e),
+                "predictions": [],
+                "model_type":  "none",
+            }
 
-    # Persist latest predictions to DB
+    # Persist predictions to DB
     if prediction.get("predictions"):
         stock = Stock.query.filter_by(ticker=ticker).first()
         if stock:

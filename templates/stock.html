@@ -198,10 +198,30 @@
   let macdChartInst   = null;
 
   // ── Load data ──────────────────────────────────────────────────────────
-  async function loadStock() {
+  async function loadStock(retries = 3) {
     try {
-      const res  = await fetch(`/api/stock/${TICKER}`);
-      const data = await res.json();
+      const res = await fetch(`/api/stock/${TICKER}`);
+
+      // Handle empty response (server timeout/restart)
+      const text = await res.text();
+      if (!text || text.trim() === "") {
+        if (retries > 0) {
+          await new Promise(r => setTimeout(r, 5000));
+          return loadStock(retries - 1);
+        }
+        throw new Error("Server returned empty response. Please refresh the page.");
+      }
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        if (retries > 0) {
+          await new Promise(r => setTimeout(r, 5000));
+          return loadStock(retries - 1);
+        }
+        throw new Error("Invalid response from server. Please refresh the page.");
+      }
 
       if (data.error) throw new Error(data.error);
       stockData = data;
@@ -214,6 +234,10 @@
       document.getElementById("pageLoader").classList.add("hidden");
       document.getElementById("mainContent").classList.remove("hidden");
     } catch (err) {
+      if (retries > 0 && err.message.includes("fetch")) {
+        await new Promise(r => setTimeout(r, 5000));
+        return loadStock(retries - 1);
+      }
       document.getElementById("pageLoader").classList.add("hidden");
       document.getElementById("errorMsg").textContent = err.message;
       document.getElementById("errorState").classList.remove("hidden");
